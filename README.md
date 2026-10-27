@@ -38,9 +38,9 @@ The app copies the parts of Lamatic Studio that are hard to test:
   - PII redaction on the response.
   - A block when a response would leak a system prompt (prompt injection).
 
-## Suite map (55 E2E tests per browser + 13 unit tests)
+## Suite map (59 E2E tests per browser + 13 unit tests)
 
-Firefox and WebKit run 52 of the 55: the three `@visual` screenshot tests are Chromium-only.
+Firefox and WebKit run 56 of the 59: the three `@visual` screenshot tests are Chromium-only.
 
 | Spec | Covers |
 |---|---|
@@ -51,6 +51,7 @@ Firefox and WebKit run 52 of the 55: the three `@visual` screenshot tests are Ch
 | `run-flow.spec.js` | Happy path order and payloads, long-running state, double-click guard, mid-flow failure → skipped downstream, HTTP 500, network drop, malformed JSON, pre-run validation, branching |
 | `ai-quality.spec.js` | Property checks on non-deterministic LLM output (grounding, token and latency budgets) across repeated runs, JSON schema, PII redaction on/off, prompt-injection leak block |
 | `visual-a11y.spec.js` | Canvas, failed-run and picker screenshots (`@visual`, Chromium); axe WCAG 2 A/AA scans; keyboard-only insert flow |
+| `responsive.spec.js` | Phone width (375×812): no horizontal overflow, *Test flow* reachable and a run succeeds (`@smoke`, so it also runs on the live URL), palette behind a "Nodes" toggle, run panel in one column; toggle absent on desktop |
 | `tests/unit/graph.test.js` | Cycle detection, connection rules, edge split, topological order, validation, golden cases for PII redaction, drag-payload fallback |
 
 ## Design decisions

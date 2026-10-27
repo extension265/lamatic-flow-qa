@@ -95,3 +95,21 @@ pre { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; fo
 .final-output pre { margin: 6px 0 0; }
 
 .toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 10; }
+
+/* phone width (< 768px). Everything above this line is the desktop layout, unchanged. */
+.nodes-toggle { display: none; }
+@media (max-width: 767.98px) {
+  .app { grid-template-rows: auto 1fr auto; height: 100dvh; }
+  .topbar { flex-wrap: wrap; gap: 6px 8px; padding: 8px 12px; }
+  .actions { flex-wrap: wrap; gap: 6px; }
+  .nodes-toggle { display: inline-block; }
+
+  /* The palette becomes a drawer over the left of the canvas. */
+  .workspace { grid-template-columns: minmax(0, 1fr); position: relative; }
+  .sidebar { display: none; }
+  .sidebar.is-open { display: block; position: absolute; inset: 0 auto 0 0; width: 220px; z-index: 20; box-shadow: 4px 0 16px rgba(0,0,0,.12); }
+  .config-panel { position: absolute; inset: 0; width: auto; z-index: 30; border-left: none; }
+
+  .run-panel { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px 12px; }
+  .picker { max-width: calc(100vw - 32px); }
+}

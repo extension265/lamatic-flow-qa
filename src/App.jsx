@@ -72,6 +72,7 @@ function Builder() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
   const [pickerEdge, setPickerEdge] = useState(null);
   const [configNodeId, setConfigNodeId] = useState(null);
+  const [paletteOpen, setPaletteOpen] = useState(false); // phone-width drawer only
   const [toast, setToast] = useState(null);
   const [runState, setRunState] = useState({});
   const [summary, setSummary] = useState(null);
@@ -166,6 +167,7 @@ function Builder() {
     snapshot();
     const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     setNodes((nds) => [...nds, makeNode(nextId(kind), kind, { x: position.x - 110, y: position.y - 30 })]);
+    setPaletteOpen(false); // on phones, get the drawer out of the way of the new node
   }, [screenToFlowPosition, snapshot, setNodes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onPick = (kind) => {
@@ -268,6 +270,15 @@ function Builder() {
         <header className="topbar">
           <div className="brand"><span className="logo" aria-hidden="true">◆</span> Flow Builder <span className="tag">QA demo</span></div>
           <div className="actions">
+            <button
+              type="button"
+              className="nodes-toggle"
+              aria-controls="node-palette"
+              aria-expanded={paletteOpen}
+              onClick={() => setPaletteOpen((o) => !o)}
+            >
+              Nodes
+            </button>
             <button type="button" onClick={undo} aria-label="Undo">↶</button>
             <button type="button" onClick={redo} aria-label="Redo">↷</button>
             <button type="button" onClick={resetFlow}>Reset</button>
@@ -280,7 +291,7 @@ function Builder() {
         </header>
 
         <div className="workspace">
-          <Sidebar />
+          <Sidebar open={paletteOpen} />
           <main className="canvas" ref={canvasRef} onDrop={onDrop} onDragOver={onDragOver} aria-label="Flow canvas">
             <ReactFlow
               nodes={nodes}

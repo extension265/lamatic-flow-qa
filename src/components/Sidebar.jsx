@@ -1,14 +1,15 @@
 import { CATEGORIES, NODE_CATALOG } from '../flow/catalog.js';
 import { writeDraggedKind } from '../flow/dnd.js';
 
-export default function Sidebar() {
+// `open` only matters below 768px, where the palette is a drawer behind the "Nodes" toggle.
+export default function Sidebar({ open = false }) {
   const onDragStart = (e, kind) => {
     writeDraggedKind(e.dataTransfer, kind);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   return (
-    <aside className="sidebar" aria-label="Node palette">
+    <aside id="node-palette" className={`sidebar${open ? ' is-open' : ''}`} aria-label="Node palette">
       <h2>Nodes</h2>
       <p className="hint">Drag onto the canvas, or hover an edge and click +</p>
       {CATEGORIES.map((cat) => (
