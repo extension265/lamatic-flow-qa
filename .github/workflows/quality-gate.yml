@@ -1,0 +1,162 @@
+name: Quality gate
+
+# The "button": Actions → Quality gate → Run workflow.
+# Every PR and push to main also runs it; a schedule re-checks the live deployment.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      browsers:
+        description: Browsers to run
+        type: choice
+        options: [all, chromium, firefox, webkit]
+        default: all
+      update_snapshots:
+        description: Re-record visual baselines and commit them
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 */6 * * *' # synthetic check of the deployed app every 6 hours
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit gate (graph rules, PII guard)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run test:unit
+
+  e2e:
+    name: E2E · ${{ matrix.project }}
+    if: github.event_name != 'schedule'
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, firefox, webkit]
+    steps:
+      - name: Skip browsers not selected
+        id: sel
+        run: |
+          want="${{ github.event.inputs.browsers || 'all' }}"
+          if [ "$want" = "all" ] || [ "$want" = "${{ matrix.project }}" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.sel.outputs.run == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.sel.outputs.run == 'true'
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+        if: steps.sel.outputs.run == 'true'
+      - run: npx playwright install --with-deps ${{ matrix.project }}
+        if: steps.sel.outputs.run == 'true'
+      - name: Run Playwright
+        if: steps.sel.outputs.run == 'true'
+        run: npx playwright test --project=${{ matrix.project }} --reporter=blob,github ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.sel.outputs.run == 'true'
+        with:
+          name: blob-${{ matrix.project }}
+          path: blob-report
+          retention-days: 7
+      - name: Upload re-recorded baselines
+        if: always() && github.event.inputs.update_snapshots == 'true' && matrix.project == 'chromium'
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshots
+          path: tests/e2e/*-snapshots
+
+  report:
+    name: Merge report
+    if: always() && github.event_name != 'schedule' && needs.unit.result == 'success'
+    needs: [unit, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with: { pattern: blob-*, path: all-blob-reports, merge-multiple: true }
+      - name: Merge per-browser results into one HTML report
+        run: npx playwright merge-reports --reporter=html,json ./all-blob-reports
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: merged-results.json
+      - name: Write job summary
+        run: |
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('merged-results.json','utf8')).stats;
+            const row = [r.expected, r.unexpected, r.flaky, r.skipped, (r.duration/1000).toFixed(1)+'s'].join(' | ');
+            console.log('### E2E results\n\n| Passed | Failed | Flaky | Skipped | Duration |\n|---|---|---|---|---|\n| ' + row + ' |');
+          " >> "$GITHUB_STEP_SUMMARY"
+      - name: Build app and bundle the report under /report
+        run: |
+          npm run build
+          cp -r playwright-report dist/report
+      - uses: actions/upload-artifact@v4
+        with: { name: playwright-report, path: playwright-report, retention-days: 14 }
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+
+  deploy:
+    name: Publish app + report to GitHub Pages
+    needs: report
+    if: always() && needs.report.result == 'success' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  commit-baselines:
+    name: Commit re-recorded visual baselines
+    needs: e2e
+    # always(): baselines come from the Chromium job only; a red Firefox/WebKit job must not drop them.
+    if: always() && github.event.inputs.update_snapshots == 'true' && needs.e2e.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: snapshots, path: tests/e2e }
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/e2e/*-snapshots
+          git diff --cached --quiet || (git commit -m "test: update visual baselines" && git push)
+
+  smoke-deployed:
+    name: Post-deploy smoke (live site)
+    needs: deploy
+    if: always() && github.ref == 'refs/heads/main' && (needs.deploy.result == 'success' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke tests against GitHub Pages
+        run: npx playwright test --project=chromium --grep @smoke
+        env:
+          BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flow Builder — Test Dashboard</title>
+<style>
+  :root { --bg:#0d1014; --panel:#151a21; --line:#252c36; --ink:#e7ebf0; --muted:#8b95a3; --ok:#3ccf7a; --err:#ff6369; --warn:#f5b84b; --run:#5aa2ff; --skip:#6b7380; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:18px 24px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  h1 { font-size:18px; margin:0; font-weight:650; } h1 span { color:#ff5a5f; }
+  .sub { color:var(--muted); font-size:13px; }
+  .controls { margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  select, button, label.chk { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font:inherit; }
+  label.chk { display:flex; gap:6px; align-items:center; cursor:pointer; }
+  button { cursor:pointer; }
+  #run { background:#ff5a5f; border-color:#ff5a5f; color:#fff; font-weight:650; padding:9px 18px; }
+  #run:disabled { opacity:.5; cursor:progress; }
+  main { padding:20px 24px 40px; max-width:1200px; margin:0 auto; }
+  .stats { display:grid; grid-template-columns:repeat(6, minmax(110px,1fr)); gap:10px; margin-bottom:14px; }
+  .stat { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .stat b { display:block; font-size:24px; font-variant-numeric:tabular-nums; }
+  .stat small { color:var(--muted); text-transform:uppercase; letter-spacing:.06em; font-size:11px; }
+  .stat.ok b { color:var(--ok); } .stat.err b { color:var(--err); } .stat.flaky b { color:var(--warn); } .stat.skip b { color:var(--skip); }
+  .bar { height:6px; background:var(--panel); border-radius:6px; overflow:hidden; display:flex; margin-bottom:18px; }
+  .bar i { display:block; height:100%; transition:width .2s; }
+  .banner { padding:12px 14px; border-radius:10px; margin-bottom:16px; display:none; align-items:center; gap:12px; }
+  .banner.show { display:flex; } .banner.ok { background:rgba(60,207,122,.12); color:var(--ok); } .banner.err { background:rgba(255,99,105,.12); color:var(--err); }
+  .banner a { color:inherit; margin-left:auto; font-weight:600; }
+  .file { background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:12px; overflow:hidden; }
+  .file h2 { margin:0; font-size:13px; padding:10px 14px; border-bottom:1px solid var(--line); display:flex; gap:8px; color:var(--muted); font-weight:600; }
+  .file h2 .count { margin-left:auto; font-variant-numeric:tabular-nums; }
+  .t { display:grid; grid-template-columns:22px 1fr auto auto; gap:10px; padding:8px 14px; border-top:1px solid #1b2129; align-items:start; }
+  .t:first-of-type { border-top:none; }
+  .icon { width:14px; height:14px; border-radius:50%; margin-top:3px; background:var(--line); }
+  .t[data-s=running] .icon { background:none; border:2px solid var(--run); border-top-color:transparent; animation:spin .8s linear infinite; }
+  .t[data-s=passed] .icon { background:var(--ok); } .t[data-s=failed] .icon, .t[data-s=timedOut] .icon { background:var(--err); }
+  .t[data-s=flaky] .icon { background:var(--warn); } .t[data-s=skipped] .icon { background:var(--skip); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .title { word-break:break-word; } .step { color:var(--run); font-size:12px; margin-top:2px; font-family:ui-monospace, Menlo, Consolas, monospace; }
+  .proj, .dur { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  pre.err { grid-column:2 / -1; margin:4px 0 2px; background:#1c1215; color:#ffb3b6; padding:10px; border-radius:6px; white-space:pre-wrap; font-size:12px; max-height:220px; overflow:auto; }
+  .empty { color:var(--muted); text-align:center; padding:60px 0; }
+  details.log { margin-top:18px; color:var(--muted); } details.log pre { background:var(--panel); padding:10px; border-radius:8px; max-height:240px; overflow:auto; font-size:12px; }
+  @media (max-width:800px){ .stats{ grid-template-columns:repeat(3,1fr);} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1><span>◆</span> Flow Builder · Test Dashboard</h1>
+    <div class="sub">Playwright E2E suite for the React Flow builder — press Run and watch every test live.</div>
+  </div>
+  <div class="controls">
+    <select id="project" aria-label="Browser">
+      <option value="chromium">Chromium</option>
+      <option value="firefox">Firefox</option>
+      <option value="webkit">WebKit</option>
+      <option value="all">All browsers</option>
+    </select>
+    <select id="spec" aria-label="Suite">
+      <option value="">All suites</option>
+      <option value="canvas">Canvas · drag & drop</option>
+      <option value="connections">Connections</option>
+      <option value="insert-step">Insert step on edge</option>
+      <option value="config">Config panel</option>
+      <option value="run-flow">Run flow & failures</option>
+      <option value="ai-quality">AI quality & guardrails</option>
+      <option value="visual-a11y">Visual & accessibility</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="headed" /> Show browser</label>
+    <button id="stop" hidden>Stop</button>
+    <button id="run">▶ Run tests</button>
+  </div>
+</header>
+<main>
+  <div class="stats">
+    <div class="stat"><small>Total</small><b id="s-total">0</b></div>
+    <div class="stat ok"><small>Passed</small><b id="s-passed">0</b></div>
+    <div class="stat err"><small>Failed</small><b id="s-failed">0</b></div>
+    <div class="stat flaky"><small>Flaky</small><b id="s-flaky">0</b></div>
+    <div class="stat skip"><small>Skipped</small><b id="s-skipped">0</b></div>
+    <div class="stat"><small>Elapsed</small><b id="s-time">0.0s</b></div>
+  </div>
+  <div class="bar" aria-hidden="true"><i id="b-ok" style="background:var(--ok)"></i><i id="b-flaky" style="background:var(--warn)"></i><i id="b-err" style="background:var(--err)"></i><i id="b-skip" style="background:var(--skip)"></i></div>
+  <div class="banner" id="banner" role="status"><span id="banner-text"></span><a id="report-link" href="/report/index.html" target="_blank" rel="noreferrer">Open full HTML report (traces, screenshots) →</a></div>
+  <div id="list"><div class="empty">No run yet. Choose a browser and press <b>Run tests</b>.</div></div>
+  <details class="log"><summary>Runner output</summary><pre id="log"></pre></details>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const state = { tests: new Map(), startedAt: 0, timer: null, running: false };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+  function setRunning(on) {
+    state.running = on;
+    $('run').disabled = on; $('stop').hidden = !on;
+    $('run').textContent = on ? 'Running…' : '▶ Run tests';
+    clearInterval(state.timer);
+    if (on) state.timer = setInterval(() => { $('s-time').textContent = ((Date.now() - state.startedAt) / 1000).toFixed(1) + 's'; }, 100);
+  }
+
+  function render() {
+    const byFile = new Map();
+    state.tests.forEach((t) => { if (!byFile.has(t.file)) byFile.set(t.file, []); byFile.get(t.file).push(t); });
+    $('list').innerHTML = [...byFile].map(([file, tests]) => {
+      const done = tests.filter((t) => !['queued', 'running'].includes(t.s)).length;
+      return `<section class="file"><h2>${esc(file)}<span class="count">${done}/${tests.length}</span></h2>${tests.map((t) => `
+        <div class="t" data-s="${t.s}">
+          <div class="icon" title="${t.s}"></div>
+          <div><div class="title">${esc(t.title)}</div>${t.s === 'running' && t.step ? `<div class="step">${esc(t.step)}</div>` : ''}</div>
+          <div class="proj">${esc(t.project)}${t.retry ? ' · retry ' + t.retry : ''}</div>
+          <div class="dur">${t.duration != null ? (t.duration / 1000).toFixed(2) + 's' : ''}</div>
+          ${t.error && t.s !== 'passed' && t.s !== 'flaky' ? `<pre class="err">${esc(t.error)}</pre>` : ''}
+        </div>`).join('')}</section>`;
+    }).join('') || '<div class="empty">No tests matched.</div>';
+
+    const all = [...state.tests.values()];
+    const count = (s) => all.filter((t) => t.s === s).length;
+    const total = all.length || 1;
+    const c = { passed: count('passed'), failed: count('failed') + count('timedOut') + count('interrupted'), flaky: count('flaky'), skipped: count('skipped') };
+    $('s-total').textContent = all.length; $('s-passed').textContent = c.passed; $('s-failed').textContent = c.failed;
+    $('s-flaky').textContent = c.flaky; $('s-skipped').textContent = c.skipped;
+    $('b-ok').style.width = (c.passed / total * 100) + '%'; $('b-err').style.width = (c.failed / total * 100) + '%';
+    $('b-flaky').style.width = (c.flaky / total * 100) + '%'; $('b-skip').style.width = (c.skipped / total * 100) + '%';
+  }
+
+  function handle(e) {
+    switch (e.type) {
+      case 'started':
+        state.tests.clear(); state.startedAt = e.at; $('log').textContent = ''; $('banner').className = 'banner';
+        setRunning(true); render(); break;
+      case 'begin':
+        e.tests.forEach((t) => state.tests.set(t.id, { ...t, s: 'queued' })); render(); break;
+      case 'testBegin': {
+        const t = state.tests.get(e.id); if (t) { t.s = 'running'; t.retry = e.retry; t.step = ''; } render(); break;
+      }
+      case 'step': {
+        const t = state.tests.get(e.id); if (t && t.s === 'running') { t.step = e.title; render(); } break;
+      }
+      case 'testEnd': {
+        const t = state.tests.get(e.id); if (!t) break;
+        t.duration = e.duration; t.error = e.error; t.retry = e.retry;
+        // A failed attempt that will be retried stays "running" until its final result.
+        if (e.status === 'failed' && e.outcome === 'flaky') t.s = 'flaky';
+        else if (e.outcome === 'flaky') t.s = 'flaky';
+        else t.s = e.status === 'passed' ? 'passed' : e.status;
+        render(); break;
+      }
+      case 'log': $('log').textContent += e.line + '\n'; break;
+      case 'exit': {
+        setRunning(false);
+        const failed = [...state.tests.values()].filter((t) => ['failed', 'timedOut', 'interrupted'].includes(t.s)).length;
+        $('banner').className = 'banner show ' + (failed || e.code ? 'err' : 'ok');
+        $('banner-text').textContent = failed ? `${failed} test(s) failed.` : e.code ? `Runner exited with code ${e.code} — see runner output.` : 'All tests passed.';
+        $('s-time').textContent = ((Date.now() - state.startedAt) / 1000).toFixed(1) + 's';
+        break;
+      }
+    }
+  }
+
+  new EventSource('/events').onmessage = (m) => handle(JSON.parse(m.data));
+
+  $('run').onclick = () => fetch('/run', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ project: $('project').value, spec: $('spec').value, headed: $('headed').checked }),
+  });
+  $('stop').onclick = () => fetch('/stop', { method: 'POST' });
+</script>
+</body>
+</html>

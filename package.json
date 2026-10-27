@@ -1,0 +1,31 @@
+{
+  "name": "lamatic-flow-qa",
+  "version": "1.0.0",
+  "description": "React Flow builder + Playwright quality suite (Lamatic.ai assessment)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:unit": "node --test \"tests/unit/**/*.test.js\"",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test": "npm run test:unit && npm run test:e2e",
+    "report": "playwright show-report",
+    "dashboard": "node dashboard/server.js"
+  },
+  "author": "Saikat Ganguly",
+  "license": "MIT",
+  "dependencies": {
+    "@xyflow/react": "^12.12.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.5"
+  },
+  "private": true,
+  "type": "module"
+}
