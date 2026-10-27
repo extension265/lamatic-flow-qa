@@ -31,7 +31,7 @@ jobs:
   unit:
     name: Unit gate (graph rules, PII guard)
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,7 +43,7 @@ jobs:
     name: E2E · ${{ matrix.project }}
     if: github.event_name != 'schedule'
     needs: unit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -62,11 +62,13 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
         if: steps.sel.outputs.run == 'true'
+      # Fail fast if apt stalls: on ubuntu-latest (mid-migration to Ubuntu 26) this step hung until the 20-min job limit.
       - run: npx playwright install --with-deps ${{ matrix.project }}
         if: steps.sel.outputs.run == 'true'
+        timeout-minutes: 10
       - name: Run Playwright
         if: steps.sel.outputs.run == 'true'
-        run: npx playwright test --project=${{ matrix.project }} --reporter=blob,github ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
+        run: npx playwright test --project=${{ matrix.project }} --reporter=blob,github ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots=all' || '' }}
       - uses: actions/upload-artifact@v4
         if: always() && steps.sel.outputs.run == 'true'
         with:
@@ -84,7 +86,7 @@ jobs:
     name: Merge report
     if: always() && github.event_name != 'schedule' && needs.unit.result == 'success'
     needs: [unit, e2e]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -116,7 +118,7 @@ jobs:
     name: Publish app + report to GitHub Pages
     needs: report
     if: always() && needs.report.result == 'success' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
@@ -132,7 +134,7 @@ jobs:
     needs: e2e
     # always(): baselines come from the Chromium job only; a red Firefox/WebKit job must not drop them.
     if: always() && github.event.inputs.update_snapshots == 'true' && needs.e2e.result != 'cancelled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -149,7 +151,7 @@ jobs:
     name: Post-deploy smoke (live site)
     needs: deploy
     if: always() && github.ref == 'refs/heads/main' && (needs.deploy.result == 'success' || github.event_name == 'schedule')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

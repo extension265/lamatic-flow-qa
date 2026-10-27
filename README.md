@@ -99,6 +99,11 @@ Chromium passed 53/53 from the start. WebKit failed 19 tests and Firefox failed 
 
 **Verification:** `npm test` is green on all three browsers, and `npx playwright test --repeat-each=3` gives 477/477.
 
+### CI findings (first Linux run)
+
+- **WebKit's job timed out without running a test.** `npx playwright install --with-deps webkit` hung for the whole 20-minute job while `ubuntu-latest` was migrating to Ubuntu 26. Chromium (55/55) and Firefox (52/52) passed in the same run. **Fix:** pin `runs-on: ubuntu-24.04`. An unpinned image is wrong here anyway, because visual baselines depend on the OS's font rendering. The install step also gets a 10-minute timeout, so a stall fails fast and names the step.
+- **Visual tests passed without comparing anything.** With `updateSnapshots: 'missing'`, a run with no Linux baselines writes them and passes. **Fix:** CI uses `'none'`, so a missing baseline fails, and baselines are recorded only through the workflow's explicit `update_snapshots` run (`--update-snapshots=all`).
+
 ## Not covered here, and how I'd extend this at Lamatic
 
 - **Real executor.** Point `BASE_URL` at a staging Studio and swap the route mock for contract tests on the GraphQL execution API: schema, errors, auth and tenant isolation.

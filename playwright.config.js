@@ -17,9 +17,10 @@ export default defineConfig({
   retries: isCI ? 1 : 0,
   workers: isCI ? 2 : undefined,
   timeout: 30_000,
-  // Visual baselines are OS/browser specific. Missing ones are recorded on first run
-  // (in CI: run the workflow with "update_snapshots" to record and commit them).
-  updateSnapshots: 'missing',
+  // Visual baselines are OS/browser specific. Locally, missing ones are recorded on
+  // first run. In CI a missing baseline is a failure ('missing' would write it and pass,
+  // so nothing would ever be compared). Record them with the workflow's "update_snapshots".
+  updateSnapshots: isCI ? 'none' : 'missing',
   expect: {
     timeout: 5_000,
     toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: 'disabled' },
